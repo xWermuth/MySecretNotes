@@ -34,6 +34,9 @@ CREATE TABLE users (
 
 INSERT INTO users VALUES(null,"admin", "password");
 INSERT INTO users VALUES(null,"bernardo", "omgMPC");
+
+INSERT INTO users VALUES(null,"stud", "Y&jTb9p?GDHX@eK&sk&7nEz5PN9c5@$i$ep3Q3p6");
+
 INSERT INTO notes VALUES(null,2,"1993-09-23 10:10:10","hello my friend",1234567890);
 INSERT INTO notes VALUES(null,2,"1993-09-23 12:10:10","i want lunch pls",1234567891);
 
@@ -80,15 +83,23 @@ def notes():
             db.close()
         elif request.form['submit_button'] == 'import note':
             noteid = request.form['noteid']
+          
+            statement = """SELECT * from NOTES where publicID = %s""" %(noteid)
             db = connect_db()
             c = db.cursor()
-            statement = """SELECT * from NOTES where publicID = '?'""" 
-            c.execute(statement, noteid)
+
+
+            c.executescript(statement)
             result = c.fetchall()
+
+            print(result)
+            print(statement)
+
+            print(result)
             if(len(result)>0):
                 row = result[0]
                 statement = """INSERT INTO notes(id,assocUser,dateWritten,note,publicID) VALUES(null,?,?,?,?);""" 
-                c.execute(statement, (session['userid'],row[2],row[3],row[4]))
+                c.execute(statement, (session['userid'], row[2], row[3], row[4]))
             else:
                 importerror="No such note with that ID!"
             db.commit()
@@ -96,9 +107,9 @@ def notes():
     
     db = connect_db()
     c = db.cursor()
-    statement = "SELECT * FROM notes WHERE assocUser = '?';" 
+    statement = "SELECT * FROM notes WHERE assocUser = ?;" 
     print(statement)
-    c.execute(statement,session['userid'])
+    c.execute(statement,(session['userid'], ))
     notes = c.fetchall()
     print(notes)
     

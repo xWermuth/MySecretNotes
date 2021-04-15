@@ -1,19 +1,29 @@
-import json, sqlite3, click, functools, os, hashlib,time, random, sys
-from flask import Flask, current_app, g, session, redirect, render_template, url_for, request
-
-
+import json, sqlite3, click, functools, os, hashlib, time, random, sys
+from flask import (
+    Flask,
+    current_app,
+    g,
+    session,
+    redirect,
+    render_template,
+    url_for,
+    request,
+)
 
 
 ### DATABASE FUNCTIONS ###
 
+
 def connect_db():
     return sqlite3.connect(app.database)
+
 
 def init_db():
     """Initializes the database with our great SQL schema"""
     conn = connect_db()
     db = conn.cursor()
-    db.executescript("""
+    db.executescript(
+        """
 
 DROP TABLE IF EXISTS users;
 DROP TABLE IF EXISTS notes;
@@ -36,13 +46,20 @@ INSERT INTO users VALUES(null,"admin", "password");
 INSERT INTO users VALUES(null,"bernardo", "omgMPC");
 
 INSERT INTO users VALUES(null,"stud", "Y&jTb9p?GDHX@eK&sk&7nEz5PN9c5@$i$ep3Q3p6");
+INSERT INTO users VALUES(null,"shh_user", "Y&jTb9p?GDHX@eK&sk&7nEz5PN9c5@$i$ep3Q3p6");
 
+INSERT INTO notes VALUES(null,1,"1993-09-23 10:10:10","helasdaslo my friend",1234567891);
+INSERT INTO notes VALUES(null,1,"1993-09-23 10:10:10","hello masdy friend",1234567890);
 INSERT INTO notes VALUES(null,2,"1993-09-23 10:10:10","hello my friend",1234567890);
 INSERT INTO notes VALUES(null,2,"1993-09-23 12:10:10","i want lunch pls",1234567891);
 
-""")
+"""
+    )
 
 
+"""
+INSERT INTO notes VALUES(null,1,"1993-09-23 10:10:10", (SELECT password FROM users WHERE id = 2),1234567891);
+"""
 
 ### APPLICATION SETUP ###
 app = Flask(__name__)
@@ -53,122 +70,129 @@ app.secret_key = os.urandom(32)
 def login_required(view):
     @functools.wraps(view)
     def wrapped_view(**kwargs):
-        if not session.get('logged_in'):
-            return redirect(url_for('login'))
+        if not session.get("logged_in"):
+            return redirect(url_for("login"))
         return view(**kwargs)
+
     return wrapped_view
+
 
 @app.route("/")
 def index():
-    if not session.get('logged_in'):
-        return render_template('index.html')
+    if not session.get("logged_in"):
+        return render_template("index.html")
     else:
-        return redirect(url_for('notes'))
+        return redirect(url_for("notes"))
 
 
-@app.route("/notes/", methods=('GET', 'POST'))
+@app.route("/notes/", methods=("GET", "POST"))
 @login_required
 def notes():
-    importerror=""
-    #Posting a new note:
-    if request.method == 'POST':
-        if request.form['submit_button'] == 'add note':
-            note = request.form['noteinput']
+    importerror = ""
+    # Posting a new note:
+    if request.method == "POST":
+        if request.form["submit_button"] == "add note":
+            note = request.form["noteinput"]
             db = connect_db()
             c = db.cursor()
-            statement = """INSERT INTO notes(id,assocUser,dateWritten,note,publicID) VALUES(null,?,?,?,?);""" 
-            print(statement)
-            c.execute(statement, (session['userid'],time.strftime('%Y-%m-%d %H:%M:%S'),note,random.randrange(1000000000, 9999999999)))
+            statement = """INSERT INTO notes(id,assocUser,dateWritten,note,publicID) VALUES(null,?,?,?,?);"""
+            print("note statement", statement)
+            c.execute(
+                statement,
+                (
+                    session["userid"],
+                    time.strftime("%Y-%m-%d %H:%M:%S"),
+                    note,
+                    random.randrange(1000000000, 9999999999),
+                ),
+            )
             db.commit()
             db.close()
-        elif request.form['submit_button'] == 'import note':
-            noteid = request.form['noteid']
-          
-            statement = """SELECT * from NOTES where publicID = %s""" %(noteid)
-            db = connect_db()
-            c = db.cursor()
+        elif request.form["submit_button"] == "import note":
+            try:
+                noteid = request.form["noteid"]
 
+                statement = """SELECT * from NOTES where publicID = %s""" % (noteid)
+                db = connect_db()
+                c = db.cursor()
 
-            c.executescript(statement)
-            result = c.fetchall()
+                c.executescript(statement)
+                result = c.fetchall()
+                # result = c.fetchmany()
+                print("result", result)
+                if len(result) > 0:
+                    row = result[0]
+                    statement = """INSERT INTO notes(id,assocUser,dateWritten,note,publicID) VALUES(null,?,?,?,?);"""
+                    c.execute(statement, (session["userid"], row[2], row[3], row[4]))
+                else:
+                    importerror = "No such note with that ID!"
+                db.commit()
+                db.close()
+            except Exception as e:
+                importerror = e
+                print("should print error", e)
 
-            print(result)
-            print(statement)
-
-            print(result)
-            if(len(result)>0):
-                row = result[0]
-                statement = """INSERT INTO notes(id,assocUser,dateWritten,note,publicID) VALUES(null,?,?,?,?);""" 
-                c.execute(statement, (session['userid'], row[2], row[3], row[4]))
-            else:
-                importerror="No such note with that ID!"
-            db.commit()
-            db.close()
-    
     db = connect_db()
     c = db.cursor()
-    statement = "SELECT * FROM notes WHERE assocUser = ?;" 
-    print(statement)
-    c.execute(statement,(session['userid'], ))
+    statement = "SELECT * FROM notes WHERE assocUser = ?;"
+
+    c.execute(statement, (session["userid"],))
     notes = c.fetchall()
-    print(notes)
-    
-    return render_template('notes.html',notes=notes,importerror=importerror)
+
+    return render_template("notes.html", notes=notes, importerror=importerror)
 
 
-@app.route("/login/", methods=('GET', 'POST'))
+@app.route("/login/", methods=("GET", "POST"))
 def login():
     error = ""
-    if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
+    if request.method == "POST":
+        username = request.form["username"]
+        password = request.form["password"]
         db = connect_db()
         c = db.cursor()
         statement = "SELECT * FROM users WHERE username = ? AND password = ?;"
-        c.execute(statement,(username, password))
+        c.execute(statement, (username, password))
         result = c.fetchall()
 
         if len(result) > 0:
             session.clear()
-            session['logged_in'] = True
-            session['userid'] = result[0][0]
-            session['username']=result[0][1]
-            return redirect(url_for('index'))
+            session["logged_in"] = True
+            session["userid"] = result[0][0]
+            session["username"] = result[0][1]
+            return redirect(url_for("index"))
         else:
             error = "Wrong username or password!"
-    return render_template('login.html',error=error)
+    return render_template("login.html", error=error)
 
 
-@app.route("/register/", methods=('GET', 'POST'))
+@app.route("/register/", methods=("GET", "POST"))
 def register():
     errored = False
     usererror = ""
     passworderror = ""
-    if request.method == 'POST':
-        
+    if request.method == "POST":
 
-        username = request.form['username']
-        password = request.form['password']
+        username = request.form["username"]
+        password = request.form["password"]
         db = connect_db()
         c = db.cursor()
         pass_statement = """SELECT * FROM users WHERE password = ?;"""
-        user_statement = """SELECT * FROM users WHERE username = ?;""" 
+        user_statement = """SELECT * FROM users WHERE username = ?;"""
 
-        print(user_statement)
         c.execute(pass_statement, (password,))
-        if(len(c.fetchall())>0):
+        if len(c.fetchall()) > 0:
             errored = True
             passworderror = "That password is already in use by someone else!"
 
         c.execute(user_statement, (username,))
-        if(len(c.fetchall())>0):
+        if len(c.fetchall()) > 0:
             errored = True
             usererror = "That username is already in use by someone else!"
 
-        if(not errored):
-            statement = """INSERT INTO users(id,username,password) VALUES(null,?,?);""" 
-            print(statement)
-            c.execute(statement, (username,password))
+        if not errored:
+            statement = """INSERT INTO users(id,username,password) VALUES(null,?,?);"""
+
+            c.execute(statement, (username, password))
             db.commit()
             db.close()
             return f"""<html>
@@ -180,10 +204,12 @@ def register():
                         </body>
                         </html>
                         """
-        
+
         db.commit()
         db.close()
-    return render_template('register.html',usererror=usererror,passworderror=passworderror)
+    return render_template(
+        "register.html", usererror=usererror, passworderror=passworderror
+    )
 
 
 @app.route("/logout/")
@@ -191,17 +217,20 @@ def register():
 def logout():
     """Logout: clears the session"""
     session.clear()
-    return redirect(url_for('index'))
+    return redirect(url_for("index"))
+
 
 if __name__ == "__main__":
-    #create database if it doesn't exist yet
-    if not os.path.exists(app.database):
-        init_db()
+    # create database if it doesn't exist yet
+    # if not os.path.exists(app.database):
+    init_db()
     runport = 5000
-    if(len(sys.argv)==2):
+    if len(sys.argv) == 2:
         runport = sys.argv[1]
     try:
-        app.run(host='0.0.0.0', port=runport) # runs on machine ip address to make it visible on netowrk
+        app.run(
+            host="0.0.0.0", port=runport
+        )  # runs on machine ip address to make it visible on netowrk
     except:
         print("Something went wrong. the usage of the server is either")
         print("'python3 app.py' (to start on port 5000)")
